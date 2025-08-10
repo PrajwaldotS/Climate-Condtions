@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibrant Weather</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6dd5ed, #2193b0);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+            transition: background 0.5s ease;
+        }
+
+        .weather-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .weather-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
+        }
+
+        .search-button {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .search-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-left-color: #ffffff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="app-container" class="w-full max-w-md mx-auto">
+        
+        <!-- Main Weather App -->
+        <div id="weather-app" class="weather-card p-6 md:p-8 text-white text-center">
+            <h1 class="text-3xl md:text-4xl font-bold mb-6">Weather Now</h1>
+
+            <!-- Search Bar -->
+            <div class="flex items-center justify-center mb-6">
+                <input type="text" id="city-input" class="w-full p-3 rounded-l-lg bg-white/30 placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter city name...">
+                <button id="search-btn" class="search-button text-white font-bold py-3 px-6 rounded-r-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </button>
+            </div>
+            
+            <div class="loader" id="loader"></div>
+
+            <!-- Error Message -->
+            <div id="error-message" class="text-red-300 bg-red-900/50 p-3 rounded-lg hidden mb-4"></div>
+
+            <!-- Weather Info Display -->
+            <div id="weather-info" class="space-y-4" style="display: none;">
+                <h2 id="city-name" class="text-2xl md:text-3xl font-semibold"></h2>
+                <div class="flex items-center justify-center">
+                    <img id="weather-icon" src="" alt="Weather Icon" class="w-20 h-20 md:w-24 md:h-24 -ml-4">
+                    <p id="temperature" class="text-5xl md:text-6xl font-bold"></p>
+                </div>
+                <p id="description" class="text-xl capitalize"></p>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 text-sm md:text-base">
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <p class="font-semibold">Humidity</p>
+                        <p id="humidity"></p>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <p class="font-semibold">Wind Speed</p>
+                        <p id="wind-speed"></p>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg col-span-2 sm:col-span-1">
+                        <p class="font-semibold">Pressure</p>
+                        <p id="pressure"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- IMPORTANT ---
+        // Paste your OpenWeatherMap API key between the quotes below.
+        const apiKey = '4f663bbbac47881b2fa9b5561537896e';
+
+        // DOM Elements
+        const weatherApp = document.getElementById('weather-app');
+        const cityInput = document.getElementById('city-input');
+        const searchBtn = document.getElementById('search-btn');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        const weatherInfo = document.getElementById('weather-info');
+        const cityNameEl = document.getElementById('city-name');
+        const weatherIconEl = document.getElementById('weather-icon');
+        const temperatureEl = document.getElementById('temperature');
+        const descriptionEl = document.getElementById('description');
+        const humidityEl = document.getElementById('humidity');
+        const windSpeedEl = document.getElementById('wind-speed');
+        const pressureEl = document.getElementById('pressure');
+
+        
+        async function getWeatherData(city) {
+           
+
+            const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+            
+            showLoader(true);
+            hideError();
+            weatherInfo.style.display = 'none';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'City not found');
+                }
+                const data = await response.json();
+                displayWeatherData(data);
+                updateBackground(data.weather[0].main);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // Display fetched weather data on the UI
+        function displayWeatherData(data) {
+            weatherInfo.style.display = 'block';
+            cityNameEl.textContent = `${data.name}, ${data.sys.country}`;
+            weatherIconEl.src = `https://openweathermap.org/img/wn/${data.weather[0].icon}@4x.png`;
+            temperatureEl.textContent = `${Math.round(data.main.temp)}°C`;
+            descriptionEl.textContent = data.weather[0].description;
+            humidityEl.textContent = `${data.main.humidity}%`;
+            windSpeedEl.textContent = `${data.wind.speed} m/s`;
+            pressureEl.textContent = `${data.main.pressure} hPa`;
+        }
+        
+        // Update background based on weather condition
+        function updateBackground(weather) {
+            const body = document.body;
+            switch(weather.toLowerCase()) {
+                case 'clear':
+                    body.style.background = 'linear-gradient(135deg, #24fe41, #fdfc47)';
+                    break;
+                case 'clouds':
+                    body.style.background = 'linear-gradient(135deg, #bdc3c7, #2c3e50)';
+                    break;
+                case 'rain':
+                case 'drizzle':
+                    body.style.background = 'linear-gradient(135deg, #00c6ff, #0072ff)';
+                    break;
+                case 'thunderstorm':
+                    body.style.background = 'linear-gradient(135deg, #1f1c2c, #928dab)';
+                    break;
+                case 'snow':
+                    body.style.background = 'linear-gradient(135deg, #e6dada, #274046)';
+                    break;
+                case 'mist':
+                case 'smoke':
+                case 'haze':
+                case 'dust':
+                case 'fog':
+                case 'sand':
+                case 'ash':
+                case 'squall':
+                case 'tornado':
+                     body.style.background = 'linear-gradient(135deg, #606c88, #3f4c6b)';
+                     break;
+                default:
+                    body.style.background = 'linear-gradient(135deg, #6dd5ed, #2193b0)';
+            }
+        }
+
+        // Utility functions for UI state
+        function showLoader(show) {
+            loader.style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            weatherInfo.style.display = 'none';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Event Listeners
+        searchBtn.addEventListener('click', () => {
+            getWeatherData(cityInput.value.trim());
+        });
+
+        cityInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                getWeatherData(cityInput.value.trim());
+            }
+        });
+    </script>
+</body>
+</html>
